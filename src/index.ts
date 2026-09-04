@@ -34,6 +34,21 @@ const s3Client = new S3Client({
     accessKeyId: S3_ACCESS_KEY_ID,
     secretAccessKey: S3_SECRET_ACCESS_KEY,
   },
+  // Required for any non-AWS S3-compatible endpoint (SeaweedFS, MinIO,
+  // Cloudflare R2, etc.) — without this the SDK defaults to
+  // virtual-hosted-style addressing (http://<bucket>.<endpoint>/<key>).
+  // Against a plain host:port endpoint with no wildcard DNS, that silently
+  // does NOT error: the request still goes out, but the server parses the
+  // request path's first segment as the bucket name instead of the Host
+  // header, so every operation naming a bucket writes/reads/deletes at the
+  // wrong location. Confirmed live against SeaweedFS: a
+  // put_object(bucket="mesh-backups", key="vet-test/probe.txt") silently
+  // created a *new* bucket literally named "vet-test" containing
+  // "probe.txt", while reporting success and never touching mesh-backups
+  // at all. forcePathStyle makes the SDK send bucket+key both in the
+  // path (http://<endpoint>/<bucket>/<key>), which every S3-compatible
+  // server (including real AWS) understands unambiguously.
+  forcePathStyle: true,
 });
 
 const server = new Server(
